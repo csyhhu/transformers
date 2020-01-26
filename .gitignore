@@ -139,3 +139,7 @@ serialization_dir
 # emacs
 *.*~
 debug.env
+
+./WorkSpace/cache/
+./glue_data/
+./Results/
