@@ -25,8 +25,12 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
+from quantTransformers.modeling_bert import QuantBertForSequenceClassification
+# from quantTransformers.test import  BertForSequenceClassification as QuantBertForSequenceClassification
+
 MODEL_CLASSES = {
     "bert": (BertConfig, BertForSequenceClassification, BertTokenizer),
+    "qbert": (BertConfig, QuantBertForSequenceClassification, BertTokenizer),
     "xlnet": (XLNetConfig, XLNetForSequenceClassification, XLNetTokenizer),
     "xlm": (XLMConfig, XLMForSequenceClassification, XLMTokenizer),
     "roberta": (RobertaConfig, RobertaForSequenceClassification, RobertaTokenizer),

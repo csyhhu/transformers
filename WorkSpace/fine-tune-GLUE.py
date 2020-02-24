@@ -21,7 +21,7 @@ from utils.miscellaneous import MODEL_CLASSES
 # -----------------------------------
 task_name = 'mrpc'
 data_dir = '../glue_data/MRPC'
-model_type = 'bert'
+model_type = 'qbert'
 cache_dir = '../Results/%s-cache' %task_name
 config_name = ""
 tokenizer_name = ""

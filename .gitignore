@@ -143,3 +143,5 @@ debug.env
 ./WorkSpace/cache/
 ./glue_data/
 ./Results/
+./WorkSpace/MRPC.zip
+./WorkSpace/Results

@@ -13,7 +13,7 @@ def load_and_cache_examples(dataset_name, task_name, tokenizer,
                             evaluate=False):
 
     data_dir_list = {
-        'glue': ['../glue_data']
+        'glue': ['../glue_data/%s' %task_name.upper()]
     }
 
     data_dir = None
@@ -58,3 +58,43 @@ def load_and_cache_examples(dataset_name, task_name, tokenizer,
         raise NotImplementedError
 
     return dataset
+
+if __name__ == '__main__':
+
+    from transformers import BertTokenizer, BertConfig
+    from torch.utils.data.dataloader import DataLoader
+    from utils.miscellaneous import MODEL_CLASSES
+
+    eval_batch_size = 128
+    task_name = 'mrpc'
+    model_type = 'bert'
+    # config_name = ""
+    # tokenizer_name = ""
+    pretrain_dir = './Results/BERT-GLUE-MRPC/pretrain'
+
+    processor = glue_processors[task_name]()
+    output_mode = glue_output_modes[task_name]
+    label_list = processor.get_labels()  # ['0', '1']
+    num_labels = len(label_list)
+
+    # ------------------
+    # Get configuration
+    # ------------------
+    config_class, model_class, tokenizer_class = MODEL_CLASSES[model_type]
+    # config = config_class.from_pretrained(
+    #     config_name if config_name else model_name_or_path,
+    #     num_labels=num_labels,
+    #     finetuning_task=task_name,
+    #     cache_dir=cache_dir,
+    # )
+
+    # --------------
+    # Get Tokenizer
+    # --------------
+    tokenizer = tokenizer_class.from_pretrained(
+        pretrained_model_name_or_path=pretrain_dir
+    )
+
+    eval_dataset = load_and_cache_examples(
+        dataset_name='glue', task_name='mrpc', tokenizer=tokenizer, evaluate=True)
+    eval_dataloader = DataLoader(eval_dataset, batch_size=eval_batch_size)
