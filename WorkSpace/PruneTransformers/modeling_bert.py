@@ -3,9 +3,9 @@ import torch.nn as nn
 
 from transformers.modeling_utils import PreTrainedModel, prune_linear_layer
 from transformers.modeling_bert import BertEmbeddings, BertPooler, \
-    BertPreTrainedModel, BertEncoder, BertModel
+    BertPreTrainedModel, BertIntermediate, BertOutput, BertSelfOutput
 
-from utils.quantize import quantized_Linear
+# from utils.quantize import quantized_Linear
 
 import math
 import sys
@@ -46,9 +46,9 @@ BertLayerNorm = torch.nn.LayerNorm
 #     pass
 
 
-class QuantBertSelfAttention(nn.Module):
+class DynamicHeadSelfAttention(nn.Module):
     def __init__(self, config):
-        super(QuantBertSelfAttention, self).__init__()
+        super(DynamicHeadSelfAttention, self).__init__()
         if config.hidden_size % config.num_attention_heads != 0:
             raise ValueError(
                 "The hidden size (%d) is not a multiple of the number of attention "
@@ -59,13 +59,11 @@ class QuantBertSelfAttention(nn.Module):
         self.attention_head_size = int(config.hidden_size / config.num_attention_heads) # 768 / 12 = 64
         self.all_head_size = self.num_attention_heads * self.attention_head_size # 12 * 64 = 768
 
-        # self.query = quantized_Linear(config.hidden_size, self.all_head_size, config.bitW)
-        # self.key = quantized_Linear(config.hidden_size, self.all_head_size, config.bitW)
-        # self.value = quantized_Linear(config.hidden_size, self.all_head_size, config.bitW)
+        self.num_heads = config.num_heads
         # It actually contains the #num_attention_heads projector:
-        #  [hidden_size (128), attention_head_size (64)] * [num_attention_heads (12)]
-        self.query = nn.Linear(config.hidden_size, self.all_head_size)  # [128, 768]
-        self.key = nn.Linear(config.hidden_size, self.all_head_size)
+        #  [hidden_size (768), attention_head_size (64)] * [num_attention_heads (12)]
+        self.query = nn.Linear(config.hidden_size, self.all_head_size)  # [768, 768]
+        self.key   = nn.Linear(config.hidden_size, self.all_head_size)
         self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
@@ -77,8 +75,10 @@ class QuantBertSelfAttention(nn.Module):
 
     def forward(self, hidden_states, attention_mask=None, head_mask=None, encoder_hidden_states=None, encoder_attention_mask=None):
         mixed_query_layer = self.query(hidden_states)
-        # print('Self-attention input:')
-        # print(hidden_states.shape) # torch.Size([10, 128, 768])
+        print('Self-attention input:')
+        print(hidden_states.shape) # torch.Size([10, 128, 768])
+        print('Mixed query layer:')
+        print(mixed_query_layer.shape)
         # If this is instantiated as a cross-attention module, the keys
         # and values come from an encoder; the attention mask needs to be
         # such that the encoder's padding tokens are not attended to.
@@ -144,11 +144,11 @@ class QuantBertSelfOutput(nn.Module):
         return hidden_states
 
 
-class QunatBertAttention(nn.Module):
+class DynamicHeadBertAttention(nn.Module):
     def __init__(self, config):
-        super(QunatBertAttention, self).__init__()
-        self.self = QuantBertSelfAttention(config)
-        self.output = QuantBertSelfOutput(config)
+        super(DynamicHeadBertAttention, self).__init__()
+        self.self = DynamicHeadSelfAttention(config)
+        self.output = BertSelfOutput(config)
         self.pruned_heads = set()
 
     def prune_heads(self, heads):
@@ -216,16 +216,17 @@ class QuantBertOutput(nn.Module):
         return hidden_states
 
 
-class QuantBertLayer(nn.Module):
+class DynamicHeadBertLayer(nn.Module):
 
     def __init__(self, config):
-        super(QuantBertLayer, self).__init__()
-        self.attention = QunatBertAttention(config)
+        super(DynamicHeadBertLayer, self).__init__()
+        self.attention = DynamicHeadBertAttention(config)
         self.is_decoder = config.is_decoder # False
         if self.is_decoder:
-            self.crossattention = QunatBertAttention(config)
-        self.intermediate = QuantBertIntermediate(config)
-        self.output = QuantBertOutput(config)
+            self.crossattention = DynamicHeadBertAttention(config)
+        # self.intermediate = QuantBertIntermediate(config)
+        self.intermediate = BertIntermediate(config)
+        self.output = BertOutput(config)
 
     def forward(self, hidden_states, attention_mask=None, head_mask=None, encoder_hidden_states=None, encoder_attention_mask=None):
         self_attention_outputs = self.attention(hidden_states, attention_mask, head_mask)
@@ -260,12 +261,14 @@ class QuantBertLayer(nn.Module):
         return outputs
 
 
-class QuantBertEncoder(nn.Module):
+class DynamicHeadBertEncoder(nn.Module):
     def __init__(self, config):
-        super(QuantBertEncoder, self).__init__()
+        super(DynamicHeadBertEncoder, self).__init__()
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
-        self.layer = nn.ModuleList([QuantBertLayer(config) for _ in range(config.num_hidden_layers)]) # num_hidden_layers: 12
+        self.layer = nn.ModuleList(
+            [DynamicHeadBertLayer(config) for _ in range(config.num_hidden_layers)]
+        ) # num_hidden_layers: 12
 
     def forward(self, hidden_states, attention_mask=None, head_mask=None, encoder_hidden_states=None, encoder_attention_mask=None):
         all_hidden_states = ()
@@ -297,15 +300,14 @@ class QuantBertEncoder(nn.Module):
         return outputs  # last-layer hidden state, (all hidden states), (all attentions)
 
 
-class QuantBertModel(BertPreTrainedModel):
+class DynamicHeadBertModel(BertPreTrainedModel):
 
     def __init__(self, config):
-        super(QuantBertModel, self).__init__(config)
+        super(DynamicHeadBertModel, self).__init__(config)
         self.config = config
-
+        self.num_heads = config.num_heads
         self.embeddings = BertEmbeddings(config)
-        self.encoder = QuantBertEncoder(config)
-        # self.encoder = BertEncoder(config)
+        self.encoder = DynamicHeadBertEncoder(config)
         self.pooler = BertPooler(config)
 
         self.init_weights()
@@ -440,12 +442,12 @@ class QuantBertModel(BertPreTrainedModel):
         return outputs  # sequence_output, pooled_output, (hidden_states), (attentions)
 
 
-class QuantBertForSequenceClassification(BertPreTrainedModel):
+class DynamicHeadBertForSequenceClassification(BertPreTrainedModel):
     def __init__(self, config):
-        super(QuantBertForSequenceClassification, self).__init__(config)
+        super(DynamicHeadBertForSequenceClassification, self).__init__(config)
         self.num_labels = config.num_labels
-
-        self.bert = QuantBertModel(config)
+        self.num_heads = config.num_heads
+        self.bert = DynamicHeadBertModel(config)
         # self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.config.num_labels)
@@ -494,10 +496,13 @@ if __name__ == '__main__':
 
     tokenizer = BertTokenizer.from_pretrained(
         pretrained_model_name_or_path='./Results/BERT-GLUE-MRPC/pretrain'
+        # "bert-base-uncased"
     )
     config = BertConfig.from_pretrained(
         pretrained_model_name_or_path='./Results/BERT-GLUE-MRPC/pretrain'
+        # "bert-base-uncased"
     )
+    config.num_heads = 1
     device = 'cuda'
 
     dataset = load_and_cache_examples(
@@ -511,7 +516,7 @@ if __name__ == '__main__':
               "attention_mask": batch[1]}
     targets = batch[3]
 
-    model = QuantBertModel(config=config)
+    model = DynamicHeadBertModel(config=config)
     # model = BertEmbeddings(config=config)
     model.to(device)
     with torch.no_grad():

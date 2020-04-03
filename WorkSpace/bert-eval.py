@@ -13,14 +13,13 @@ import torch
 from torch.utils.data.dataloader import DataLoader
 
 from transformers.data.processors import glue_processors, glue_output_modes
-from transformers.optimization import AdamW, get_linear_schedule_with_warmup
 from transformers.data.metrics import glue_compute_metrics as compute_metrics
 
 from utils.dataset import load_and_cache_examples
 from utils.miscellaneous import MODEL_CLASSES
 
 import argparse
-parser = argparse.ArgumentParser(description='Quant BERT')
+parser = argparse.ArgumentParser(description='BERT evaulation')
 parser.add_argument('--model_type', '-m', type=str,
                     default='qbert', help='Model Arch')
 args = parser.parse_args()
@@ -43,6 +42,7 @@ warmup_steps = 10
 t_total = 1e3
 use_cuda = torch.cuda.is_available()
 device = 'cuda' if use_cuda else 'cpu'
+# print(device)
 # -----------------------------------
 
 processor = glue_processors[task_name]()
@@ -62,6 +62,9 @@ config = config_class.from_pretrained(
     pretrained_model_name_or_path = model_name if pretrain_dir is None else pretrain_dir,
     cache_dir=cache_dir, do_lower_case=True,
 )
+
+# Add bitW
+config.bitW = 1
 
 # --------------
 # Get Tokenizer

@@ -53,7 +53,7 @@ class Function_STE(torch.autograd.Function):
 
 class quantized_Linear(nn.Linear):
 
-    def __init__(self, in_features, out_features, bias=True, bitW = 1):
+    def __init__(self, in_features, out_features, bias=True, bitW = 32):
         super(quantized_Linear, self).__init__(in_features, out_features, bias=bias)
 
         self.quantized_weight = None
@@ -61,9 +61,13 @@ class quantized_Linear(nn.Linear):
         self.bitW = bitW
         self.alpha = None
 
-        print('Initial quantized Linear with bit %d' % self.bitW)
+        print('Initial Quantized Linear with bit %d' % self.bitW)
 
     def forward(self, input, quantized = 'dorefa'):
+
+        if self.bitW == 32:
+            self.quantized_weight = self.weight
+            return F.linear(input, self.quantized_weight, self.bias)
 
         if quantized == 'dorefa':
             temp_weight = torch.tanh(self.weight)

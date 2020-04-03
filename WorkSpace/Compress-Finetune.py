@@ -1,5 +1,5 @@
 """
-This code simplifies run_glue.py to perform fine-tune on BERT using GLUE data
+This code performs compressing fine-tuning
 """
 import argparse
 import logging
@@ -22,50 +22,53 @@ parser = argparse.ArgumentParser()
 # -------
 # Hyper Parameters for Training
 # -------
-parser.add_argument("--train_batch_size", default=32, type=int,
+parser.add_argument("--train_batch_size", '-bs', default=32, type=int,
                     help=" ")
-parser.add_argument("--eval_batch_size", default=16, type=int,
+parser.add_argument("--eval_batch_size", '-eval_bs', default=16, type=int,
                     help=" ")
-parser.add_argument("--learning_rate", default=2e-5, type=float,
+parser.add_argument("--learning_rate", '-lr', default=2e-5, type=float,
                     help="The initial learning rate for Adam.")
-parser.add_argument("--weight_decay", default=0.0, type=float,
+parser.add_argument("--weight_decay", '-wd', default=0.0, type=float,
                     help="Weight decay if we apply some.")
 parser.add_argument("--adam_epsilon", default=1e-8, type=float,
                     help="Epsilon for Adam optimizer.")
 parser.add_argument("--max_grad_norm", default=1.0, type=float,
                     help="Max gradient norm.")
-parser.add_argument("--num_train_epochs", default=3, type=int,
+parser.add_argument("--num_train_epochs", "-epoch", default=3, type=int,
                     help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_steps", default=0, type=int,
                     help="Linear warmup over warmup_steps.")
-parser.add_argument(
-    "--first_eval",
-    action="store_true",
-    help="Whether to perform first evaluation",
-)
+parser.add_argument("--first_eval", action="store_true",
+                    help="Whether to perform first evaluation",)
+parser.add_argument( "--prune", action="store_true",
+                    help="Whether to perform pruning",)
+parser.add_argument( "--bitW", '-bitW', default=8, type=int,
+                    help="")
+parser.add_argument( "--CR", '-CR', default=0.3, type=float,
+                    help="")
 # --------
 # Mixed-Precision Training
 # ---------
-parser.add_argument(
-    "--fp16",
-    action="store_true",
-    help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit",
-)
-parser.add_argument(
-    "--fp16_opt_level",
-    type=str,
-    default="O1",
-    help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
-    "See details at https://nvidia.github.io/apex/amp.html",
-)
+# parser.add_argument(
+#     "--fp16",
+#     action="store_true",
+#     help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit",
+# )
+# parser.add_argument(
+#     "--fp16_opt_level",
+#     type=str,
+#     default="O1",
+#     help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
+#     "See details at https://nvidia.github.io/apex/amp.html",
+# )
 args = parser.parse_args()
 print(args)
 # -----------------------------------
 task_name = 'mrpc'
 data_dir = '../glue_data/MRPC'
-model_type = 'bert'
+model_type = 'sbert' if args.prune else 'qbert'
 # cache_dir = '../Results/%s-cache' %task_name
-cache_dir = '../Results/cache/%s' % task_name
+cache_dir = './cache'
 config_name = ""
 tokenizer_name = ""
 model_name_or_path = "bert-base-uncased"
@@ -77,7 +80,6 @@ learning_rate = args.learning_rate
 adam_epsilon = args.adam_epsilon
 warmup_steps = args.warmup_steps
 max_grad_norm = args.max_grad_norm
-# t_total = 1e3
 n_epoch = args.num_train_epochs
 use_cuda = torch.cuda.is_available()
 device = 'cuda'
@@ -98,6 +100,10 @@ config = config_class.from_pretrained(
     finetuning_task=task_name,
     cache_dir=cache_dir,
 )
+if args.prune:
+    config.CR = args.CR
+else:
+    config.bitW = args.bitW
 
 # --------------
 # Get Tokenizer
@@ -114,11 +120,10 @@ tokenizer = tokenizer_class.from_pretrained(
 model = model_class.from_pretrained(
     model_name_or_path,
     # from_tf=bool(".ckpt" in model_name_or_path),
-    # config=config,
+    config=config,
     cache_dir=cache_dir if cache_dir else None,
 )
 print('Model Loaded Successfully')
-
 model.to(device)
 
 # ------------

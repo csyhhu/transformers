@@ -17,6 +17,9 @@
 import os
 # os.environ['CUDA_VISIBLE_DEVICES']='1'
 
+import warnings
+warnings.filterwarnings("ignore")
+
 import argparse
 import glob
 import json
@@ -259,22 +262,24 @@ def train(args, train_dataset, model, tokenizer):
                     print(json.dumps({**logs, **{"step": global_step}}))
 
                 if args.local_rank in [-1, 0] and args.save_steps > 0 and global_step % args.save_steps == 0:
-                    # Save model checkpoint
-                    output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step))
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    model_to_save = (
-                        model.module if hasattr(model, "module") else model
-                    )  # Take care of distributed/parallel training
-                    model_to_save.save_pretrained(output_dir)
-                    tokenizer.save_pretrained(output_dir)
-
-                    torch.save(args, os.path.join(output_dir, "training_args.bin"))
-                    logger.info("Saving model checkpoint to %s", output_dir)
-
-                    torch.save(optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
-                    torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
-                    logger.info("Saving optimizer and scheduler states to %s", output_dir)
+                #     # Save model checkpoint
+                #     output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step))
+                #     if not os.path.exists(output_dir):
+                #         os.makedirs(output_dir)
+                #     model_to_save = (
+                #         model.module if hasattr(model, "module") else model
+                #     )  # Take care of distributed/parallel training
+                #     model_to_save.save_pretrained(output_dir)
+                #     tokenizer.save_pretrained(output_dir)
+                #
+                #     torch.save(args, os.path.join(output_dir, "training_args.bin"))
+                #     logger.info("Saving model checkpoint to %s", output_dir)
+                #
+                #     torch.save(optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
+                #     torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
+                #     logger.info("Saving optimizer and scheduler states to %s", output_dir)
+                #     evaluate(args, model, tokenizer, )
+                    pass
 
             if args.max_steps > 0 and global_step > args.max_steps:
                 epoch_iterator.close()
@@ -451,7 +456,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--output_dir",
-    default="../Results/MRPC",
+    default="./Results/BERT-GLUE-MRPC",
     type=str,
     # required=True,
     help="The output directory where the model predictions and checkpoints will be written.",
@@ -470,7 +475,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--cache_dir",
-    default="../Results/MRPC_cache",
+    default="./cache/mrpc",
     type=str,
     help="Where do you want to store the pre-trained models downloaded from s3",
 )
@@ -659,7 +664,7 @@ model = model_class.from_pretrained(
     cache_dir=args.cache_dir if args.cache_dir else None,
 )
 # input()
-# print(model)
+print('Model load successfully.')
 
 if args.local_rank == 0:
     torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
@@ -676,52 +681,52 @@ if args.do_train:
 
 # Saving best-practices: if you use defaults names for the model,
 # you can reload it using from_pretrained()
-if args.do_train and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
-    # Create output directory if needed
-    if not os.path.exists(args.output_dir) and args.local_rank in [-1, 0]:
-        os.makedirs(args.output_dir)
-
-    logger.info("Saving model checkpoint to %s", args.output_dir)
-    # Save a trained model, configuration and tokenizer using `save_pretrained()`.
-    # They can then be reloaded using `from_pretrained()`
-    model_to_save = (
-        model.module if hasattr(model, "module") else model
-    )  # Take care of distributed/parallel training
-    model_to_save.save_pretrained(args.output_dir)
-    tokenizer.save_pretrained(args.output_dir)
-
-    # Good practice: save your training arguments together with the trained model
-    torch.save(args, os.path.join(args.output_dir, "training_args.bin"))
-
-    # Load a trained model and vocabulary that you have fine-tuned
-    model = model_class.from_pretrained(args.output_dir)
-    tokenizer = tokenizer_class.from_pretrained(args.output_dir)
-    model.to(args.device)
+# if args.do_train and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
+#     # Create output directory if needed
+#     if not os.path.exists(args.output_dir) and args.local_rank in [-1, 0]:
+#         os.makedirs(args.output_dir)
+#
+#     logger.info("Saving model checkpoint to %s", args.output_dir)
+#     # Save a trained model, configuration and tokenizer using `save_pretrained()`.
+#     # They can then be reloaded using `from_pretrained()`
+#     model_to_save = (
+#         model.module if hasattr(model, "module") else model
+#     )  # Take care of distributed/parallel training
+#     model_to_save.save_pretrained(args.output_dir)
+#     tokenizer.save_pretrained(args.output_dir)
+#
+#     # Good practice: save your training arguments together with the trained model
+#     torch.save(args, os.path.join(args.output_dir, "training_args.bin"))
+#
+#     # Load a trained model and vocabulary that you have fine-tuned
+#     model = model_class.from_pretrained(args.output_dir)
+#     tokenizer = tokenizer_class.from_pretrained(args.output_dir)
+#     model.to(args.device)
 
 # Evaluation
-results = {}
-if args.do_eval and args.local_rank in [-1, 0]:
-    # tokenizer = tokenizer_class.from_pretrained(
-    #     args.output_dir, do_lower_case=args.do_lower_case
-    # )
-    checkpoints = [args.output_dir]
-    if args.eval_all_checkpoints:
-        checkpoints = list(
-            os.path.dirname(c) for c in sorted(glob.glob(args.output_dir + "/**/" + WEIGHTS_NAME, recursive=True))
-        )
-        logging.getLogger("transformers.modeling_utils").setLevel(logging.WARN)  # Reduce logging
-    logger.info("Evaluate the following checkpoints: %s", checkpoints)
-    for checkpoint in checkpoints:
-        global_step = checkpoint.split("-")[-1] if len(checkpoints) > 1 else ""
-        prefix = checkpoint.split("/")[-1] if checkpoint.find("checkpoint") != -1 else ""
-
-        # model = model_class.from_pretrained(checkpoint)
-        model.to(args.device)
-        result = evaluate(args, model, tokenizer, prefix=prefix)
-        result = dict((k + "_{}".format(global_step), v) for k, v in result.items())
-        results.update(result)
-
-print(results)
+# results = {}
+# if args.do_eval and args.local_rank in [-1, 0]:
+#     # tokenizer = tokenizer_class.from_pretrained(
+#     #     args.output_dir, do_lower_case=args.do_lower_case
+#     # )
+#     checkpoints = [args.output_dir]
+#     if args.eval_all_checkpoints:
+#         checkpoints = list(
+#             os.path.dirname(c) for c in sorted(glob.glob(args.output_dir + "/**/" + WEIGHTS_NAME, recursive=True))
+#         )
+#         logging.getLogger("transformers.modeling_utils").setLevel(logging.WARN)  # Reduce logging
+#     logger.info("Evaluate the following checkpoints: %s", checkpoints)
+#     for checkpoint in checkpoints:
+#         global_step = checkpoint.split("-")[-1] if len(checkpoints) > 1 else ""
+#         prefix = checkpoint.split("/")[-1] if checkpoint.find("checkpoint") != -1 else ""
+#
+#         # model = model_class.from_pretrained(checkpoint)
+#         model.to(args.device)
+#         result = evaluate(args, model, tokenizer, prefix=prefix)
+#         result = dict((k + "_{}".format(global_step), v) for k, v in result.items())
+#         results.update(result)
+#
+# print(results)
 # return results
 
 
