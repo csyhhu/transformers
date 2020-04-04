@@ -75,11 +75,6 @@ class DynamicHeadSelfAttention(nn.Module):
         return x.permute(0, 2, 1, 3)
 
     def forward(self, hidden_states, attention_mask=None, head_mask=None, encoder_hidden_states=None, encoder_attention_mask=None):
-
-        # --------
-        # Dynamic Prune Query / Key / Value Projection Or Judge by Input Feature?
-        # --------
-
         mixed_query_layer = self.query(hidden_states)
         # print('Self-attention input:')
         # print(hidden_states.shape) # torch.Size([10, 128, 768])
@@ -117,7 +112,7 @@ class DynamicHeadSelfAttention(nn.Module):
         # ------
         # Calculate attention
         # ------
-
+        
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.dropout(attention_probs)
