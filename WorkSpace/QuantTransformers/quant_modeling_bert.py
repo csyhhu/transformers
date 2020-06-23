@@ -13,7 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""PyTorch BERT model. """
+"""
+A basic quantization-aware training BERT
+
+"""
 
 
 import logging
@@ -30,6 +33,7 @@ from transformers.file_utils import add_start_docstrings, add_start_docstrings_t
 from transformers.modeling_utils import PreTrainedModel, prune_linear_layer
 from transformers.modeling_bert import BertPreTrainedModel, BertPreTrainingHeads, \
     BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BERT_INPUTS_DOCSTRING, BERT_START_DOCSTRING, load_tf_weights_in_bert, mish, ACT2FN
+from utils.quantize import quantized_Linear, quantized_Embedding
 
 
 logger = logging.getLogger(__name__)
@@ -91,11 +95,13 @@ class BertSelfAttention(nn.Module):
         self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.query = nn.Linear(config.hidden_size, self.all_head_size)
-        self.key = nn.Linear(config.hidden_size, self.all_head_size)
-        self.value = nn.Linear(config.hidden_size, self.all_head_size)
+        self.query = quantized_Linear(config.hidden_size, self.all_head_size, bitW=config.bitW)
+        self.key = quantized_Linear(config.hidden_size, self.all_head_size, bitW=config.bitW)
+        self.value = quantized_Linear(config.hidden_size, self.all_head_size, bitW=config.bitW)
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
+
+        # config.layer_name_list.append([])
 
     def transpose_for_scores(self, x):
         new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
@@ -158,7 +164,7 @@ class BertSelfAttention(nn.Module):
 class BertSelfOutput(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.dense = quantized_Linear(config.hidden_size, config.hidden_size, bitW=config.bitW)
         self.LayerNorm = BertLayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
@@ -218,7 +224,7 @@ class BertAttention(nn.Module):
 class BertIntermediate(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
+        self.dense = quantized_Linear(config.hidden_size, config.intermediate_size, bitW=config.bitW)
         if isinstance(config.hidden_act, str):
             self.intermediate_act_fn = ACT2FN[config.hidden_act]
         else:
@@ -233,7 +239,7 @@ class BertIntermediate(nn.Module):
 class BertOutput(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
+        self.dense = quantized_Linear(config.intermediate_size, config.hidden_size, bitW=config.bitW)
         self.LayerNorm = BertLayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
@@ -323,7 +329,7 @@ class BertEncoder(nn.Module):
 class BertPooler(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.dense = quantized_Linear(config.hidden_size, config.hidden_size, bitW=config.bitW)
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states):
@@ -1053,5 +1059,6 @@ class BertForQuestionAnswering(BertPreTrainedModel):
 if __name__ == '__main__':
     from transformers import BertConfig
     config = BertConfig()
-
+    config.bitW = 8
+    config.layer_name_list = []
     encoder = BertEncoder(config=config)

@@ -27,29 +27,33 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-from PruneTransformers.modeling_bert import DynamicHeadBertForSequenceClassification
-from QuantTransformers.modeling_bert import QuantBertForSequenceClassification
+from PruneTransformers.structure_sparse_modeling_bert import StructureSparseBertForSequenceClassification
+from QuantTransformers.quant_modeling_bert import BertForSequenceClassification as QuantBertForSequenceClassification
+from QuantTransformers.quant_modeling_albert import AlbertForSequenceClassification as QuantAlbertForSequenceClassification
 
 MODEL_CLASSES = {
     "bert": (BertConfig, BertForSequenceClassification, BertTokenizer),
     "qbert": (BertConfig, QuantBertForSequenceClassification, BertTokenizer),
+    "strbert": (BertConfig, StructureSparseBertForSequenceClassification, BertTokenizer),
     "xlnet": (XLNetConfig, XLNetForSequenceClassification, XLNetTokenizer),
     "xlm": (XLMConfig, XLMForSequenceClassification, XLMTokenizer),
     "roberta": (RobertaConfig, RobertaForSequenceClassification, RobertaTokenizer),
     "distilbert": (DistilBertConfig, DistilBertForSequenceClassification, DistilBertTokenizer),
     "albert": (AlbertConfig, AlbertForSequenceClassification, AlbertTokenizer),
+    "qalbert": (AlbertConfig, QuantAlbertForSequenceClassification, AlbertTokenizer),
     "xlmroberta": (XLMRobertaConfig, XLMRobertaForSequenceClassification, XLMRobertaTokenizer),
 }
 
-_, term_width = os.popen('stty size', 'r').read().split()
-term_width = int(term_width)
-
-TOTAL_BAR_LENGTH = 10.
-last_time = time.time()
-begin_time = last_time
-
 def progress_bar(current, total, msg=None):
-    global last_time, begin_time
+
+    _, term_width = os.popen('stty size', 'r').read().split()
+    term_width = int(term_width)
+
+    TOTAL_BAR_LENGTH = 10.
+    # last_time = time.time()
+    # begin_time = last_time
+
+    # global last_time, begin_time
     if current == 0:
         begin_time = time.time()  # Reset for new bar.
 
@@ -65,9 +69,9 @@ def progress_bar(current, total, msg=None):
     sys.stdout.write(']')
 
     cur_time = time.time()
-    step_time = cur_time - last_time
+    # step_time = cur_time - last_time
     last_time = cur_time
-    tot_time = cur_time - begin_time
+    # tot_time = cur_time - begin_time
 
     L = []
     # L.append('  Step: %s' % format_time(step_time))
@@ -90,6 +94,7 @@ def progress_bar(current, total, msg=None):
     else:
         sys.stdout.write('\n')
     sys.stdout.flush()
+
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
@@ -131,3 +136,17 @@ def is_int(s):
         return True
     except ValueError:
         return False
+
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+if __name__ == '__main__':
+
+    from transformers import BertConfig, AlbertConfig, BertModel, AlbertModel
+    bert = BertModel(BertConfig(hidden_size=768,num_attention_heads=12,intermediate_size=3072))
+    albert = AlbertModel(AlbertConfig(hidden_size=768,num_attention_heads=12,intermediate_size=3072))
+
+    print("Number of parameters in BERT:   %d" %count_parameters(bert))
+    print("Number of parameters in ALBERT: %d" % count_parameters(albert))

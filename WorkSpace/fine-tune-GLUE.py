@@ -11,12 +11,14 @@ import os
 import torch
 from torch.utils.data.dataloader import DataLoader
 
+from transformers import glue_compute_metrics
 from transformers.data.processors import glue_processors, glue_output_modes
 from transformers.optimization import AdamW, get_linear_schedule_with_warmup
 
 from utils.dataset import load_and_cache_examples
 from utils.miscellaneous import MODEL_CLASSES, progress_bar
 from utils.train import evaluate
+from utils.recorder import Recorder
 
 parser = argparse.ArgumentParser()
 # -------
@@ -34,7 +36,7 @@ parser.add_argument("--adam_epsilon", default=1e-8, type=float,
                     help="Epsilon for Adam optimizer.")
 parser.add_argument("--max_grad_norm", default=1.0, type=float,
                     help="Max gradient norm.")
-parser.add_argument("--num_train_epochs", default=3, type=int,
+parser.add_argument("--num_train_epochs", "-epoch", default=3, type=int,
                     help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_steps", default=0, type=int,
                     help="Linear warmup over warmup_steps.")
@@ -46,26 +48,26 @@ parser.add_argument(
 # --------
 # Mixed-Precision Training
 # ---------
-parser.add_argument(
-    "--fp16",
-    action="store_true",
-    help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit",
-)
-parser.add_argument(
-    "--fp16_opt_level",
-    type=str,
-    default="O1",
-    help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
-    "See details at https://nvidia.github.io/apex/amp.html",
-)
+# parser.add_argument(
+#     "--fp16",
+#     action="store_true",
+#     help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit",
+# )
+# parser.add_argument(
+#     "--fp16_opt_level",
+#     type=str,
+#     default="O1",
+#     help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
+#     "See details at https://nvidia.github.io/apex/amp.html",
+# )
 args = parser.parse_args()
 print(args)
 # -----------------------------------
 task_name = 'mrpc'
 data_dir = '../glue_data/MRPC'
 model_type = 'bert'
-# cache_dir = '../Results/%s-cache' %task_name
-cache_dir = '../Results/cache/%s' % task_name
+cache_dir = './cache'
+# cache_dir = '../Results/cache/%s' % task_name
 config_name = ""
 tokenizer_name = ""
 model_name_or_path = "bert-base-uncased"
@@ -118,7 +120,6 @@ model = model_class.from_pretrained(
     cache_dir=cache_dir if cache_dir else None,
 )
 print('Model Loaded Successfully')
-
 model.to(device)
 
 # ------------
@@ -156,9 +157,17 @@ if args.first_eval:
     result = evaluate(task_name, model, eval_dataloader, model_type) # ['acc', 'f1', 'acc_f1']
     print(result)
 
+# -------
+# Initialize Recorder
+# -------
+SummaryPath = './Results/BERT-GLUE-%s/runs-full-precision' %(task_name.upper())
+recorder = Recorder(SummaryPath)
+if recorder is not None:
+    recorder.write_arguments([args])
 # --------------
 # Begin Training
 # --------------
+
 for epoch_idx in range(n_epoch):
 
     print('Epoch: %d' %epoch_idx)
@@ -174,7 +183,7 @@ for epoch_idx in range(n_epoch):
             )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
         outputs = model(**inputs)
         losses = outputs[0]
-
+        logits = outputs[1]
         # model.zero_grad()
         losses.backward()
 
@@ -187,10 +196,21 @@ for epoch_idx in range(n_epoch):
         # ------
         # Record
         # ------
-        # result = compute_metrics(task_name, preds, out_label_ids)
-        train_loss += losses.item()
-
-        progress_bar(step, len(train_dataloader), "Loss: %.3f" % (train_loss / (step + 1)))
+        preds = logits.data.cpu().numpy()
+        preds = np.argmax(preds, axis=1)
+        out_label_ids = inputs["labels"].data.cpu().numpy()
+        result = glue_compute_metrics(task_name, preds, out_label_ids)  # ['acc', 'f1', 'acc_and_f1']
+        if recorder is not None:
+            recorder.update(losses.item(), acc=[result['acc_and_f1']], batch_size=args.train_batch_size, is_train=True)
+            recorder.print_training_result(batch_idx=step, n_batch=len(train_dataloader))
+        else:
+            train_loss += losses.item()
+            progress_bar(step, len(train_dataloader), "Loss: %.3f" % (train_loss / (step + 1)))
 
     result = evaluate(task_name, model, eval_dataloader, model_type)  # ['acc', 'f1', 'acc_f1']
     print(result)
+    if recorder is not None:
+        recorder.update(acc=result['acc_and_f1'], is_train=False)
+
+if recorder is not None:
+    recorder.close()

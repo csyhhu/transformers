@@ -11,12 +11,14 @@ import os
 import torch
 from torch.utils.data.dataloader import DataLoader
 
+from transformers import glue_compute_metrics
 from transformers.data.processors import glue_processors, glue_output_modes
 from transformers.optimization import AdamW, get_linear_schedule_with_warmup
 
 from utils.dataset import load_and_cache_examples
 from utils.miscellaneous import MODEL_CLASSES, progress_bar
 from utils.train import evaluate
+from utils.recorder import Recorder
 
 parser = argparse.ArgumentParser()
 # -------
@@ -40,12 +42,16 @@ parser.add_argument("--warmup_steps", default=0, type=int,
                     help="Linear warmup over warmup_steps.")
 parser.add_argument("--first_eval", action="store_true",
                     help="Whether to perform first evaluation",)
-parser.add_argument( "--prune", action="store_true",
-                    help="Whether to perform pruning",)
+parser.add_argument( "--prune", "-prune", action="store_true",
+                    help="Whether to perform pruning")
+parser.add_argument( "--model_type", "-model", type=str, required=True,
+                    help="Model Type of Compress Finetune")
 parser.add_argument( "--bitW", '-bitW', default=8, type=int,
                     help="")
-parser.add_argument( "--CR", '-CR', default=0.3, type=float,
+parser.add_argument( "--CR", '-CR', default=0.5, type=float,
                     help="")
+parser.add_argument( "--exp_spec", '-e', default=None, type=str,
+                    help="Experiment specification")
 # --------
 # Mixed-Precision Training
 # ---------
@@ -66,12 +72,13 @@ print(args)
 # -----------------------------------
 task_name = 'mrpc'
 data_dir = '../glue_data/MRPC'
-model_type = 'sbert' if args.prune else 'qbert'
+model_type = args.model_type
+# model_type = 'sbert' if args.prune else 'qbert'
 # cache_dir = '../Results/%s-cache' %task_name
 cache_dir = './cache'
 config_name = ""
 tokenizer_name = ""
-model_name_or_path = "bert-base-uncased"
+model_name_or_path = "albert-base-v1" # "bert-base-uncased"
 max_seq_length = 128
 train_batch_size = args.train_batch_size
 eval_batch_size = args.eval_batch_size
@@ -119,7 +126,6 @@ tokenizer = tokenizer_class.from_pretrained(
 # ---------
 model = model_class.from_pretrained(
     model_name_or_path,
-    # from_tf=bool(".ckpt" in model_name_or_path),
     config=config,
     cache_dir=cache_dir if cache_dir else None,
 )
@@ -157,6 +163,19 @@ scheduler = get_linear_schedule_with_warmup(
     optimizer, num_warmup_steps=warmup_steps, num_training_steps=len(train_dataloader) * n_epoch
 )
 
+# -------
+# Initialize Recorder
+# -------
+SummaryPath = './Results/ALBERT-GLUE-%s/%s/%s/runs-%s-%d' %(
+    task_name.upper(), 'Prune' if args.prune else 'Quant',
+    args.model_type, 'CR' if args.prune else 'bitW', int(100.0 * args.CR) if args.prune else args.bitW
+)
+if args.exp_spec is not None:
+    SummaryPath += ('-' + args.exp_spec)
+recorder = Recorder(SummaryPath)
+if recorder is not None:
+    recorder.write_arguments([args])
+
 if args.first_eval:
     result = evaluate(task_name, model, eval_dataloader, model_type) # ['acc', 'f1', 'acc_f1']
     print(result)
@@ -179,6 +198,7 @@ for epoch_idx in range(n_epoch):
             )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
         outputs = model(**inputs)
         losses = outputs[0]
+        logits = outputs[1]
 
         # model.zero_grad()
         losses.backward()
@@ -192,10 +212,21 @@ for epoch_idx in range(n_epoch):
         # ------
         # Record
         # ------
-        # result = compute_metrics(task_name, preds, out_label_ids)
-        train_loss += losses.item()
+        preds = logits.data.cpu().numpy()
+        preds = np.argmax(preds, axis=1)
+        out_label_ids = inputs["labels"].data.cpu().numpy()
+        result = glue_compute_metrics(task_name, preds, out_label_ids) # ['acc', 'f1', 'acc_and_f1']
+        if recorder is not None:
+            recorder.update(losses.item(), acc=[result['acc_and_f1']], batch_size=args.train_batch_size, is_train=True)
+            recorder.print_training_result(batch_idx=step, n_batch=len(train_dataloader))
+        else:
+            train_loss += losses.item()
+            progress_bar(step, len(train_dataloader), "Loss: %.3f" % (train_loss / (step + 1)))
 
-        progress_bar(step, len(train_dataloader), "Loss: %.3f" % (train_loss / (step + 1)))
-
-    result = evaluate(task_name, model, eval_dataloader, model_type)  # ['acc', 'f1', 'acc_f1']
+    result = evaluate(task_name, model, eval_dataloader, model_type)
     print(result)
+    if recorder is not None:
+        recorder.update(acc=result['acc_and_f1'], is_train=False)
+
+if recorder is not None:
+    recorder.close()
