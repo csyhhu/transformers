@@ -28,7 +28,7 @@ class OpenAIGPTTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = OpenAIGPTTokenizer
 
     def setUp(self):
-        super(OpenAIGPTTokenizationTest, self).setUp()
+        super().setUp()
 
         # Adapted from Sennrich et al. 2015 and https://github.com/rsennrich/subword-nmt
         vocab = [
@@ -64,13 +64,8 @@ class OpenAIGPTTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         with open(self.merges_file, "w") as fp:
             fp.write("\n".join(merges))
 
-    def get_tokenizer(self, **kwargs):
-        return OpenAIGPTTokenizer.from_pretrained(self.tmpdirname, **kwargs)
-
-    def get_input_output_texts(self):
-        input_text = "lower newer"
-        output_text = "lower newer"
-        return input_text, output_text
+    def get_input_output_texts(self, tokenizer):
+        return "lower newer", "lower newer"
 
     def test_full_tokenizer(self):
         tokenizer = OpenAIGPTTokenizer(self.vocab_file, self.merges_file)

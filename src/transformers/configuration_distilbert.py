@@ -25,8 +25,11 @@ logger = logging.getLogger(__name__)
 DISTILBERT_PRETRAINED_CONFIG_ARCHIVE_MAP = {
     "distilbert-base-uncased": "https://s3.amazonaws.com/models.huggingface.co/bert/distilbert-base-uncased-config.json",
     "distilbert-base-uncased-distilled-squad": "https://s3.amazonaws.com/models.huggingface.co/bert/distilbert-base-uncased-distilled-squad-config.json",
+    "distilbert-base-cased": "https://s3.amazonaws.com/models.huggingface.co/bert/distilbert-base-cased-config.json",
+    "distilbert-base-cased-distilled-squad": "https://s3.amazonaws.com/models.huggingface.co/bert/distilbert-base-cased-distilled-squad-config.json",
     "distilbert-base-german-cased": "https://s3.amazonaws.com/models.huggingface.co/bert/distilbert-base-german-cased-config.json",
     "distilbert-base-multilingual-cased": "https://s3.amazonaws.com/models.huggingface.co/bert/distilbert-base-multilingual-cased-config.json",
+    "distilbert-base-uncased-finetuned-sst-2-english": "https://s3.amazonaws.com/models.huggingface.co/bert/distilbert-base-uncased-finetuned-sst-2-english-config.json",
 }
 
 
@@ -57,7 +60,7 @@ class DistilBertConfig(PretrainedConfig):
                 Number of attention heads for each attention layer in the Transformer encoder.
             dim (:obj:`int`, optional, defaults to 768):
                 Dimensionality of the encoder layers and the pooler layer.
-            intermediate_size (:obj:`int`, optional, defaults to 3072):
+            hidden_dim (:obj:`int`, optional, defaults to 3072):
                 The size of the "intermediate" (i.e., feed-forward) layer in the Transformer encoder.
             dropout (:obj:`float`, optional, defaults to 0.1):
                 The dropout probabilitiy for all fully connected layers in the embeddings, encoder, and pooler.
@@ -70,29 +73,24 @@ class DistilBertConfig(PretrainedConfig):
                 The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
             qa_dropout (:obj:`float`, optional, defaults to 0.1):
                 The dropout probabilities used in the question answering model
-                :class:`~tranformers.DistilBertForQuestionAnswering`.
+                :class:`~transformers.DistilBertForQuestionAnswering`.
             seq_classif_dropout (:obj:`float`, optional, defaults to 0.2):
-                The dropout probabilities used in the sequence classification model
-                :class:`~tranformers.DistilBertForSequenceClassification`.
+                The dropout probabilities used in the sequence classification and the multiple choice model
+                :class:`~transformers.DistilBertForSequenceClassification`.
 
         Example::
 
-            from transformers import DistilBertModel, DistilBertConfig
+            >>> from transformers import DistilBertModel, DistilBertConfig
 
-            # Initializing a DistilBERT configuration
-            configuration = DistilBertConfig()
+            >>> # Initializing a DistilBERT configuration
+            >>> configuration = DistilBertConfig()
 
-            # Initializing a model from the configuration
-            model = DistilBertModel(configuration)
+            >>> # Initializing a model from the configuration
+            >>> model = DistilBertModel(configuration)
 
-            # Accessing the model configuration
-            configuration = model.config
-
-        Attributes:
-            pretrained_config_archive_map (Dict[str, str]):
-                A dictionary containing all the available pre-trained checkpoints.
+            >>> # Accessing the model configuration
+            >>> configuration = model.config
     """
-    pretrained_config_archive_map = DISTILBERT_PRETRAINED_CONFIG_ARCHIVE_MAP
     model_type = "distilbert"
 
     def __init__(
@@ -110,9 +108,10 @@ class DistilBertConfig(PretrainedConfig):
         initializer_range=0.02,
         qa_dropout=0.1,
         seq_classif_dropout=0.2,
+        pad_token_id=0,
         **kwargs
     ):
-        super(DistilBertConfig, self).__init__(**kwargs)
+        super().__init__(**kwargs, pad_token_id=pad_token_id)
         self.vocab_size = vocab_size
         self.max_position_embeddings = max_position_embeddings
         self.sinusoidal_pos_embds = sinusoidal_pos_embds

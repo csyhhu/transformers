@@ -34,13 +34,13 @@ from .modeling_utils import PreTrainedModel
 logger = logging.getLogger(__name__)
 
 ####################################################
-# This dict contrains shortcut names and associated url
-# for the pretrained weights provided with the models
+# This list contrains shortcut names for some of
+# the pretrained weights provided with the models
 ####################################################
-XXX_PRETRAINED_MODEL_ARCHIVE_MAP = {
-    "xxx-base-uncased": "https://s3.amazonaws.com/models.huggingface.co/bert/xxx-base-uncased-pytorch_model.bin",
-    "xxx-large-uncased": "https://s3.amazonaws.com/models.huggingface.co/bert/xxx-large-uncased-pytorch_model.bin",
-}
+XXX_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "xxx-base-uncased",
+    "xxx-large-uncased",
+]
 
 
 ####################################################
@@ -76,7 +76,10 @@ def load_tf_weights_in_xxx(model, config, tf_checkpoint_path):
         name = name.split("/")
         # adam_v and adam_m are variables used in AdamWeightDecayOptimizer to calculated m and v
         # which are not required for using pretrained model
-        if any(n in ["adam_v", "adam_m", "global_step"] for n in name):
+        if any(
+            n in ["adam_v", "adam_m", "AdamWeightDecayOptimizer", "AdamWeightDecayOptimizer_1", "global_step"]
+            for n in name
+        ):
             logger.info("Skipping {}".format("/".join(name)))
             continue
         pointer = model
@@ -138,7 +141,7 @@ XxxOutput = nn.Module
 
 class XxxLayer(nn.Module):
     def __init__(self, config):
-        super(XxxLayer, self).__init__()
+        super().__init__()
         self.attention = XxxAttention(config)
         self.intermediate = XxxIntermediate(config)
         self.output = XxxOutput(config)
@@ -177,7 +180,6 @@ class XxxPreTrainedModel(PreTrainedModel):
     """
 
     config_class = XxxConfig
-    pretrained_model_archive_map = XXX_PRETRAINED_MODEL_ARCHIVE_MAP
     load_tf_weights = load_tf_weights_in_xxx
     base_model_prefix = "transformer"
 
@@ -283,7 +285,7 @@ class XxxModel(XxxPreTrainedModel):
             list of ``torch.FloatTensor`` (one for the output of each layer + the output of the embeddings)
             of shape ``(batch_size, sequence_length, hidden_size)``:
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        **attentions**: (`optional`, returned when ``config.output_attentions=True``)
+        **attentions**: (`optional`, returned when ``output_attentions=True``)
             list of ``torch.FloatTensor`` (one for each layer) of shape ``(batch_size, num_heads, sequence_length, sequence_length)``:
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention heads.
 
@@ -298,7 +300,7 @@ class XxxModel(XxxPreTrainedModel):
     """
 
     def __init__(self, config):
-        super(XxxModel, self).__init__(config)
+        super().__init__(config)
 
         self.embeddings = XxxEmbeddings(config)
         self.encoder = XxxEncoder(config)
@@ -346,10 +348,12 @@ class XxxModel(XxxPreTrainedModel):
             token_type_ids = torch.zeros(input_shape, dtype=torch.long, device=device)
 
         # We create a 3D attention mask from a 2D tensor mask.
+        # (this can be done with self.invert_attention_mask)
         # Sizes are [batch_size, 1, 1, to_seq_length]
         # So we can broadcast to [batch_size, num_heads, from_seq_length, to_seq_length]
         # this attention mask is more simple than the triangular masking of causal attention
         # used in OpenAI GPT, we just need to prepare the broadcast dimension here.
+
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
 
         # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
@@ -365,19 +369,7 @@ class XxxModel(XxxPreTrainedModel):
         # attention_probs has shape bsz x n_heads x N x N
         # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads]
         # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
-        if head_mask is not None:
-            if head_mask.dim() == 1:
-                head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
-                head_mask = head_mask.expand(self.config.num_hidden_layers, -1, -1, -1, -1)
-            elif head_mask.dim() == 2:
-                head_mask = (
-                    head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)
-                )  # We can specify head_mask for each layer
-            head_mask = head_mask.to(
-                dtype=next(self.parameters()).dtype
-            )  # switch to fload if need + fp16 compatibility
-        else:
-            head_mask = [None] * self.config.num_hidden_layers
+        head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
 
         ##################################
         # Replace this with your model code
@@ -411,7 +403,7 @@ class XxxForMaskedLM(XxxPreTrainedModel):
             list of ``torch.FloatTensor`` (one for the output of each layer + the output of the embeddings)
             of shape ``(batch_size, sequence_length, hidden_size)``:
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        **attentions**: (`optional`, returned when ``config.output_attentions=True``)
+        **attentions**: (`optional`, returned when ``output_attentions=True``)
             list of ``torch.FloatTensor`` (one for each layer) of shape ``(batch_size, num_heads, sequence_length, sequence_length)``:
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention heads.
 
@@ -426,7 +418,7 @@ class XxxForMaskedLM(XxxPreTrainedModel):
     """
 
     def __init__(self, config):
-        super(XxxForMaskedLM, self).__init__(config)
+        super().__init__(config)
 
         self.transformer = XxxModel(config)
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size)
@@ -491,7 +483,7 @@ class XxxForSequenceClassification(XxxPreTrainedModel):
             list of ``torch.FloatTensor`` (one for the output of each layer + the output of the embeddings)
             of shape ``(batch_size, sequence_length, hidden_size)``:
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        **attentions**: (`optional`, returned when ``config.output_attentions=True``)
+        **attentions**: (`optional`, returned when ``output_attentions=True``)
             list of ``torch.FloatTensor`` (one for each layer) of shape ``(batch_size, num_heads, sequence_length, sequence_length)``:
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention heads.
 
@@ -507,7 +499,7 @@ class XxxForSequenceClassification(XxxPreTrainedModel):
     """
 
     def __init__(self, config):
-        super(XxxForSequenceClassification, self).__init__(config)
+        super().__init__(config)
         self.num_labels = config.num_labels
 
         self.transformer = XxxModel(config)
@@ -577,7 +569,7 @@ class XxxForTokenClassification(XxxPreTrainedModel):
             list of ``torch.FloatTensor`` (one for the output of each layer + the output of the embeddings)
             of shape ``(batch_size, sequence_length, hidden_size)``:
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        **attentions**: (`optional`, returned when ``config.output_attentions=True``)
+        **attentions**: (`optional`, returned when ``output_attentions=True``)
             list of ``torch.FloatTensor`` (one for each layer) of shape ``(batch_size, num_heads, sequence_length, sequence_length)``:
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention heads.
 
@@ -593,7 +585,7 @@ class XxxForTokenClassification(XxxPreTrainedModel):
     """
 
     def __init__(self, config):
-        super(XxxForTokenClassification, self).__init__(config)
+        super().__init__(config)
         self.num_labels = config.num_labels
 
         self.transformer = XxxModel(config)
@@ -671,7 +663,7 @@ class XxxForQuestionAnswering(XxxPreTrainedModel):
             list of ``torch.FloatTensor`` (one for the output of each layer + the output of the embeddings)
             of shape ``(batch_size, sequence_length, hidden_size)``:
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        **attentions**: (`optional`, returned when ``config.output_attentions=True``)
+        **attentions**: (`optional`, returned when ``output_attentions=True``)
             list of ``torch.FloatTensor`` (one for each layer) of shape ``(batch_size, num_heads, sequence_length, sequence_length)``:
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention heads.
 
@@ -692,7 +684,7 @@ class XxxForQuestionAnswering(XxxPreTrainedModel):
     """
 
     def __init__(self, config):
-        super(XxxForQuestionAnswering, self).__init__(config)
+        super().__init__(config)
         self.num_labels = config.num_labels
 
         self.transformer = XxxModel(config)

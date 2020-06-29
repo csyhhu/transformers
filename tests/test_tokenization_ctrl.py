@@ -27,7 +27,7 @@ class CTRLTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = CTRLTokenizer
 
     def setUp(self):
-        super(CTRLTokenizationTest, self).setUp()
+        super().setUp()
 
         # Adapted from Sennrich et al. 2015 and https://github.com/rsennrich/subword-nmt
         vocab = ["adapt", "re@@", "a@@", "apt", "c@@", "t", "<unk>"]
@@ -46,7 +46,7 @@ class CTRLTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         kwargs.update(self.special_tokens_map)
         return CTRLTokenizer.from_pretrained(self.tmpdirname, **kwargs)
 
-    def get_input_output_texts(self):
+    def get_input_output_texts(self, tokenizer):
         input_text = "adapt react readapt apt"
         output_text = "adapt react readapt apt"
         return input_text, output_text

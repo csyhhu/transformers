@@ -30,16 +30,13 @@ class AlbertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = AlbertTokenizer
 
     def setUp(self):
-        super(AlbertTokenizationTest, self).setUp()
+        super().setUp()
 
         # We have a SentencePiece fixture for testing
         tokenizer = AlbertTokenizer(SAMPLE_VOCAB)
         tokenizer.save_pretrained(self.tmpdirname)
 
-    def get_tokenizer(self, **kwargs):
-        return AlbertTokenizer.from_pretrained(self.tmpdirname, **kwargs)
-
-    def get_input_output_texts(self):
+    def get_input_output_texts(self, tokenizer):
         input_text = "this is a test"
         output_text = "this is a test"
         return input_text, output_text

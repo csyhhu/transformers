@@ -32,13 +32,13 @@ from .modeling_tf_utils import TFPreTrainedModel, get_initializer, shape_list
 logger = logging.getLogger(__name__)
 
 ####################################################
-# This dict contrains shortcut names and associated url
-# for the pretrained weights provided with the models
+# This list contrains shortcut names for some of
+# the pretrained weights provided with the models
 ####################################################
-TF_XXX_PRETRAINED_MODEL_ARCHIVE_MAP = {
-    "xxx-base-uncased": "https://s3.amazonaws.com/models.huggingface.co/bert/xxx-base-uncased-tf_model.h5",
-    "xxx-large-uncased": "https://s3.amazonaws.com/models.huggingface.co/bert/xxx-large-uncased-tf_model.h5",
-}
+TF_XXX_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "xxx-base-uncased",
+    "xxx-large-uncased",
+]
 
 
 ####################################################
@@ -69,7 +69,7 @@ TFXxxOutput = tf.keras.layers.Layer
 
 class TFXxxLayer(tf.keras.layers.Layer):
     def __init__(self, config, **kwargs):
-        super(TFXxxLayer, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.attention = TFXxxAttention(config, name="attention")
         self.intermediate = TFXxxIntermediate(config, name="intermediate")
         self.transformer_output = TFXxxOutput(config, name="output")
@@ -91,7 +91,7 @@ class TFXxxLayer(tf.keras.layers.Layer):
 ####################################################
 class TFXxxMainLayer(tf.keras.layers.Layer):
     def __init__(self, config, **kwargs):
-        super(TFXxxMainLayer, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def _resize_token_embeddings(self, new_num_tokens):
         raise NotImplementedError  # Not implemented yet in the library fr TF 2.0 models
@@ -180,7 +180,6 @@ class TFXxxPreTrainedModel(TFPreTrainedModel):
     """
 
     config_class = XxxConfig
-    pretrained_model_archive_map = TF_XXX_PRETRAINED_MODEL_ARCHIVE_MAP
     base_model_prefix = "transformer"
 
 
@@ -289,7 +288,7 @@ class TFXxxModel(TFXxxPreTrainedModel):
             list of ``tf.Tensor`` (one for the output of each layer + the output of the embeddings)
             of shape ``(batch_size, sequence_length, hidden_size)``:
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        **attentions**: (`optional`, returned when ``config.output_attentions=True``)
+        **attentions**: (`optional`, returned when ``output_attentions=True``)
             list of ``tf.Tensor`` (one for each layer) of shape ``(batch_size, num_heads, sequence_length, sequence_length)``:
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention heads.
 
@@ -307,7 +306,7 @@ class TFXxxModel(TFXxxPreTrainedModel):
     """
 
     def __init__(self, config, *inputs, **kwargs):
-        super(TFXxxModel, self).__init__(config, *inputs, **kwargs)
+        super().__init__(config, *inputs, **kwargs)
         self.transformer = TFXxxMainLayer(config, name="transformer")
 
     def call(self, inputs, **kwargs):
@@ -330,7 +329,7 @@ class TFXxxForMaskedLM(TFXxxPreTrainedModel):
             list of ``Numpy array`` or ``tf.Tensor`` (one for the output of each layer + the output of the embeddings)
             of shape ``(batch_size, sequence_length, hidden_size)``:
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        **attentions**: (`optional`, returned when ``config.output_attentions=True``)
+        **attentions**: (`optional`, returned when ``output_attentions=True``)
             list of ``Numpy array`` or ``tf.Tensor`` (one for each layer) of shape ``(batch_size, num_heads, sequence_length, sequence_length)``:
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention heads.
 
@@ -348,7 +347,7 @@ class TFXxxForMaskedLM(TFXxxPreTrainedModel):
     """
 
     def __init__(self, config, *inputs, **kwargs):
-        super(TFXxxForMaskedLM, self).__init__(config, *inputs, **kwargs)
+        super().__init__(config, *inputs, **kwargs)
 
         self.transformer = TFXxxMainLayer(config, name="transformer")
         self.mlm = TFXxxMLMHead(config, self.transformer.embeddings, name="mlm")
@@ -379,7 +378,7 @@ class TFXxxForSequenceClassification(TFXxxPreTrainedModel):
             list of ``Numpy array`` or ``tf.Tensor`` (one for the output of each layer + the output of the embeddings)
             of shape ``(batch_size, sequence_length, hidden_size)``:
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        **attentions**: (`optional`, returned when ``config.output_attentions=True``)
+        **attentions**: (`optional`, returned when ``output_attentions=True``)
             list of ``Numpy array`` or ``tf.Tensor`` (one for each layer) of shape ``(batch_size, num_heads, sequence_length, sequence_length)``:
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention heads.
 
@@ -397,7 +396,7 @@ class TFXxxForSequenceClassification(TFXxxPreTrainedModel):
     """
 
     def __init__(self, config, *inputs, **kwargs):
-        super(TFXxxForSequenceClassification, self).__init__(config, *inputs, **kwargs)
+        super().__init__(config, *inputs, **kwargs)
         self.num_labels = config.num_labels
 
         self.transformer = TFXxxMainLayer(config, name="transformer")
@@ -434,7 +433,7 @@ class TFXxxForTokenClassification(TFXxxPreTrainedModel):
             list of ``Numpy array`` or ``tf.Tensor`` (one for the output of each layer + the output of the embeddings)
             of shape ``(batch_size, sequence_length, hidden_size)``:
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        **attentions**: (`optional`, returned when ``config.output_attentions=True``)
+        **attentions**: (`optional`, returned when ``output_attentions=True``)
             list of ``Numpy array`` or ``tf.Tensor`` (one for each layer) of shape ``(batch_size, num_heads, sequence_length, sequence_length)``:
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention heads.
 
@@ -452,7 +451,7 @@ class TFXxxForTokenClassification(TFXxxPreTrainedModel):
     """
 
     def __init__(self, config, *inputs, **kwargs):
-        super(TFXxxForTokenClassification, self).__init__(config, *inputs, **kwargs)
+        super().__init__(config, *inputs, **kwargs)
         self.num_labels = config.num_labels
 
         self.transformer = TFXxxMainLayer(config, name="transformer")
@@ -491,7 +490,7 @@ class TFXxxForQuestionAnswering(TFXxxPreTrainedModel):
             list of ``Numpy array`` or ``tf.Tensor`` (one for the output of each layer + the output of the embeddings)
             of shape ``(batch_size, sequence_length, hidden_size)``:
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        **attentions**: (`optional`, returned when ``config.output_attentions=True``)
+        **attentions**: (`optional`, returned when ``output_attentions=True``)
             list of ``Numpy array`` or ``tf.Tensor`` (one for each layer) of shape ``(batch_size, num_heads, sequence_length, sequence_length)``:
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention heads.
 
@@ -509,7 +508,7 @@ class TFXxxForQuestionAnswering(TFXxxPreTrainedModel):
     """
 
     def __init__(self, config, *inputs, **kwargs):
-        super(TFXxxForQuestionAnswering, self).__init__(config, *inputs, **kwargs)
+        super().__init__(config, *inputs, **kwargs)
         self.num_labels = config.num_labels
 
         self.transformer = TFXxxMainLayer(config, name="transformer")
