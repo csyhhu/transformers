@@ -1,10 +1,11 @@
 // These two things need to be updated at each release for the version selector.
 // Last stable version
-const stableVersion = "v2.11.0"
+const stableVersion = "v3.0.2"
 // Dictionary doc folder to label
 const versionMapping = {
     "master": "master",
-    "": "v2.11.0 (stable)",
+    "": "v3.0.0/v3.0.1/v3.0.2 (stable)",
+    "v2.11.0": "v2.11.0",
     "v2.10.0": "v2.10.0",
     "v2.9.1": "v2.9.0/v2.9.1",
     "v2.8.0": "v2.8.0",
@@ -20,6 +21,17 @@ const versionMapping = {
     "v1.1.0": "v1.1.0",
     "v1.0.0": "v1.0.0"
 }
+// The page that have a notebook and therefore should have the open in colab badge.
+const hasNotebook = [
+    "benchmarks",
+    "multilingual",
+    "perplexity",
+    "preprocessing",
+    "quicktour",
+    "task_summary",
+    "tokenizer_summary",
+    "training"
+];
 
 function addIcon() {
     const huggingFaceLogo = "https://huggingface.co/landing/assets/transformers-docs/huggingface_logo.svg";
@@ -81,12 +93,32 @@ function addGithubButton() {
     document.querySelector(".wy-side-nav-search .icon-home").insertAdjacentHTML('afterend', div);
 }
 
+function addColabLink() {
+    const parts = location.toString().split('/');
+    const pageName = parts[parts.length - 1].split(".")[0];
+
+    if (hasNotebook.includes(pageName)) {
+        const baseURL = "https://colab.research.google.com/github/huggingface/notebooks/blob/master/transformers_doc/"
+        const linksColab = `
+        <div class="colab-dropdown">
+            <img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg">
+            <div class="colab-dropdown-content">
+                <button onclick=" window.open('${baseURL}${pageName}.ipynb')">Mixed</button>
+                <button onclick=" window.open('${baseURL}pytorch/${pageName}.ipynb')">PyTorch</button>
+                <button onclick=" window.open('${baseURL}tensorflow/${pageName}.ipynb')">TensorFlow</button>
+            </div>
+        </div>`
+        const leftMenu = document.querySelector(".wy-breadcrumbs-aside")
+        leftMenu.innerHTML = linksColab + '\n' + leftMenu.innerHTML
+    }
+}
+
 function addVersionControl() {
     // To grab the version currently in view, we parse the url
     const parts = location.toString().split('/');
     let versionIndex = parts.length - 2;
     // Index page may not have a last part with filename.html so we need to go up
-    if (parts[parts.length - 1] != "" && ! parts[parts.length - 1].match(/\.html$/)) {
+    if (parts[parts.length - 1] != "" && ! parts[parts.length - 1].match(/\.html$|^search.html?/)) {
         versionIndex = parts.length - 1;
     }
     // Main classes and models are nested so we need to go deeper
@@ -148,6 +180,7 @@ function addHfMenu() {
     <div class="menu">
         <a href="/welcome">🔥 Sign in</a>
         <a href="/models">🚀 Models</a>
+        <a href="http://discuss.huggingface.co">💬 Forum</a>
     </div>
     `;
     document.body.insertAdjacentHTML('afterbegin', div);
@@ -253,6 +286,7 @@ function onLoad() {
     addGithubButton();
     parseGithubButtons();
     addHfMenu();
+    addColabLink();
     platformToggle();
 }
 

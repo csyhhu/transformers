@@ -112,3 +112,24 @@ ReformerModelWithLMHead
 
 .. autoclass:: transformers.ReformerModelWithLMHead
     :members:
+
+
+ReformerForMaskedLM
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: transformers.ReformerForMaskedLM
+    :members:
+
+
+ReformerForSequenceClassification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: transformers.ReformerForSequenceClassification
+    :members:
+
+
+ReformerForQuestionAnswering
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: transformers.ReformerForQuestionAnswering
+    :members:
